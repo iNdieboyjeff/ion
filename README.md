@@ -22,7 +22,7 @@
    * text/plain
    * application/json - both [JsonObject](https://github.com/koush/ion#post-json-and-read-json) and [POJO](https://github.com/koush/ion#seamlessly-use-your-own-java-classes-with-gson)
    * [application/x-www-form-urlencoded](https://github.com/koush/ion#post-applicationx-www-form-urlencoded-and-read-a-string)
-   * [multipart/form-data](https://github.com/koush/ion#post-multipartform-data-and-read-json)
+   * [multipart/form-data](https://github.com/koush/ion#post-multipartform-data-and-read-json-with-an-upload-progress-bar)
  * Transparent usage of HTTP features and optimizations:
    * Caching
    * Gzip/Deflate Compression
@@ -94,10 +94,11 @@ Ion.with(getContext(), "https://koush.clockworkmod.com/test/echo")
 .setCallback(...)
 ```
 
-#### Post multipart/form-data and read JSON
+#### Post multipart/form-data and read JSON with an upload progress bar
 
 ```java
 Ion.with(getContext(), "https://koush.clockworkmod.com/test/echo")
+.uploadProgressBar(uploadProgressBar)
 .setMultipartParameter("goop", "noop")
 .setMultipartFile("filename.zip", new File("/sdcard/filename.zip"))
 .asJsonObject()
