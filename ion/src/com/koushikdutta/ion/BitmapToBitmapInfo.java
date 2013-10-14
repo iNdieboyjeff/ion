@@ -1,12 +1,10 @@
 package com.koushikdutta.ion;
 
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
+import android.util.Log;
 
 import com.koushikdutta.async.ByteBufferList;
-import com.koushikdutta.async.future.Future;
 import com.koushikdutta.async.future.FutureCallback;
-import com.koushikdutta.async.future.SimpleFuture;
 import com.koushikdutta.async.http.ResponseCacheMiddleware;
 import com.koushikdutta.async.http.libcore.DiskLruCache;
 import com.koushikdutta.ion.bitmap.BitmapInfo;
@@ -26,7 +24,7 @@ class BitmapToBitmapInfo extends BitmapCallback implements FutureCallback<Bitmap
         ion.getServer().getExecutorService().execute(new Runnable() {
             @Override
             public void run() {
-                final LoadBitmap callback = new LoadBitmap(ion, transformKey, true, 0, 0, Loader.LoaderEmitter.LOADED_FROM_CACHE);
+                final LoadBitmap callback = new LoadBitmap(ion, transformKey, true, -1, -1, Loader.LoaderEmitter.LOADED_FROM_CACHE);
 
                 try {
                     DiskLruCache.Snapshot snapshot = ion.getResponseCache().getDiskLruCache().get(transformKey);
@@ -44,7 +42,7 @@ class BitmapToBitmapInfo extends BitmapCallback implements FutureCallback<Bitmap
                     }
                 }
                 catch (Exception e) {
-                    callback.report(e, null);
+                    callback.onCompleted(e, null);
                     try {
                         ion.getResponseCache().getDiskLruCache().remove(transformKey);
                     }
@@ -55,15 +53,24 @@ class BitmapToBitmapInfo extends BitmapCallback implements FutureCallback<Bitmap
         });
     }
 
-    public BitmapToBitmapInfo(Ion ion, String transformKey, ArrayList<Transform> transforms) {
+    String downloadKey;
+    public BitmapToBitmapInfo(Ion ion, String transformKey, String downloadKey, ArrayList<Transform> transforms) {
         super(ion, transformKey, true);
         this.transforms = transforms;
+        this.downloadKey = downloadKey;
+
+        ion.bitmapsPending.tag(transformKey, this);
     }
 
     @Override
     public void onCompleted(Exception e, final BitmapInfo result) {
         if (e != null) {
             report(e, null);
+            return;
+        }
+
+        if (ion.bitmapsPending.tag(key) != this) {
+            Log.d("IonBitmapLoader", "Bitmap transform cancelled (no longer needed)");
             return;
         }
 
