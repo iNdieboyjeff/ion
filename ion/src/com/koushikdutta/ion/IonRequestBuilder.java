@@ -26,20 +26,21 @@ import com.koushikdutta.async.Util;
 import com.koushikdutta.async.callback.CompletedCallback;
 import com.koushikdutta.async.future.Future;
 import com.koushikdutta.async.future.FutureCallback;
-import com.koushikdutta.async.future.SimpleFuture;
 import com.koushikdutta.async.future.TransformFuture;
 import com.koushikdutta.async.http.AsyncHttpGet;
 import com.koushikdutta.async.http.AsyncHttpPost;
 import com.koushikdutta.async.http.AsyncHttpRequest;
-import com.koushikdutta.async.http.body.AsyncHttpRequestBody;
 import com.koushikdutta.async.http.Multimap;
+import com.koushikdutta.async.http.body.AsyncHttpRequestBody;
 import com.koushikdutta.async.http.body.DocumentBody;
 import com.koushikdutta.async.http.body.FileBody;
 import com.koushikdutta.async.http.body.MultipartFormDataBody;
+import com.koushikdutta.async.http.body.StreamBody;
 import com.koushikdutta.async.http.body.StringBody;
 import com.koushikdutta.async.http.body.UrlEncodedFormBody;
 import com.koushikdutta.async.http.libcore.RawHeaders;
 import com.koushikdutta.async.parser.AsyncParser;
+import com.koushikdutta.async.parser.DocumentParser;
 import com.koushikdutta.async.parser.StringParser;
 import com.koushikdutta.async.stream.OutputStreamDataSink;
 import com.koushikdutta.ion.Loader.LoaderEmitter;
@@ -47,7 +48,6 @@ import com.koushikdutta.ion.builder.Builders;
 import com.koushikdutta.ion.builder.FutureBuilder;
 import com.koushikdutta.ion.builder.LoadBuilder;
 import com.koushikdutta.ion.future.ResponseFuture;
-import com.koushikdutta.async.parser.DocumentParser;
 import com.koushikdutta.ion.gson.GsonBody;
 import com.koushikdutta.ion.gson.GsonParser;
 import com.koushikdutta.ion.gson.GsonSerializer;
@@ -121,6 +121,13 @@ class IonRequestBuilder implements Builders.Any.B, Builders.Any.F, Builders.Any.
     public IonRequestBuilder addHeader(String name, String value) {
         getHeaders().add(name, value);
         return this;
+    }
+
+    boolean noCache;
+    @Override
+    public Builders.Any.B noCache() {
+        noCache = true;
+        return setHeader("Cache-Control", "no-cache");
     }
 
     Multimap query;
@@ -766,6 +773,18 @@ class IonRequestBuilder implements Builders.Any.B, Builders.Any.F, Builders.Any.
     @Override
     public Builders.Any.F setFileBody(File file) {
         setBody(new FileBody(file));
+        return this;
+    }
+
+    @Override
+    public Builders.Any.F setStreamBody(InputStream inputStream) {
+        setBody(new StreamBody(inputStream, -1));
+        return this;
+    }
+
+    @Override
+    public Builders.Any.F setStreamBody(InputStream inputStream, int length) {
+        setBody(new StreamBody(inputStream, length));
         return this;
     }
 }
