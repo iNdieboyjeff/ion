@@ -308,7 +308,7 @@ class IonRequestBuilder implements Builders.Any.B, Builders.Any.F, Builders.Any.
                             public void run() {
                                 if (ret.isCancelled() || ret.isDone())
                                     return;
-                                progressHandler.onProgress(downloaded, total);
+                                uploadProgressHandler.onProgress(downloaded, total);
                             }
                         });
                     }
@@ -329,10 +329,12 @@ class IonRequestBuilder implements Builders.Any.B, Builders.Any.F, Builders.Any.
         ret.setComplete(new Exception("Unknown uri scheme"));
     }
 
+    // transforms a LoaderEmitter, which is a DataEmitter and all associated properties about the data source
+    // into the final result.
     class EmitterTransform<T> extends TransformFuture<T, LoaderEmitter> implements ResponseFuture<T> {
-        private AsyncHttpRequest initialRequest;
-        private AsyncHttpRequest finalRequest;
-        private int loadedFrom;
+        AsyncHttpRequest initialRequest;
+        AsyncHttpRequest finalRequest;
+        int loadedFrom;
         Runnable cancelCallback;
         RawHeaders headers;
         DataEmitter emitter;
