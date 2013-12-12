@@ -106,7 +106,7 @@ class IonRequestBuilder implements Builders.Any.B, Builders.Any.F, Builders.Any.
     private RawHeaders getHeaders() {
         if (headers == null) {
             headers = new RawHeaders();
-            AsyncHttpRequest.setDefaultHeaders(headers, URI.create(uri));
+            AsyncHttpRequest.setDefaultHeaders(headers, uri == null ? null : URI.create(uri));
         }
         return headers;
     }
@@ -335,6 +335,7 @@ class IonRequestBuilder implements Builders.Any.B, Builders.Any.F, Builders.Any.
         for (Loader loader: ion.loaders) {
             Future<DataEmitter> emitter = loader.load(ion, request, ret);
             if (emitter != null) {
+                request.logi("Using loader: " + loader);
                 ret.setParent(emitter);
                 return;
             }
