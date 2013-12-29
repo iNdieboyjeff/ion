@@ -24,17 +24,8 @@ import java.net.URI;
 /**
  * Created by koush on 11/6/13.
  */
-public class VideoLoader implements Loader {
+public class VideoLoader extends SimpleLoader {
     private static final String TAG = "IonVideoLoader";
-    @Override
-    public Future<DataEmitter> load(Ion ion, AsyncHttpRequest request, FutureCallback<LoaderEmitter> callback) {
-        return null;
-    }
-
-    @Override
-    public Future<InputStream> load(Ion ion, AsyncHttpRequest request) {
-        return null;
-    }
 
     public static Bitmap createVideoThumbnail(String filePath) {
         // MediaMetadataRetriever is available on API Level 8
@@ -85,21 +76,18 @@ public class VideoLoader implements Loader {
     }
 
     @Override
-    public Future<BitmapInfo> loadBitmap(Ion ion, String uri) {
-        if (Build.VERSION.SDK_INT < 12)
-            return null;
-
+    public Future<BitmapInfo> loadBitmap(Ion ion, String uri, int resizeWidth, int resizeHeight) {
         if (!uri.startsWith(ContentResolver.SCHEME_FILE))
             return null;
 
         final File file = new File(URI.create(uri));
 
         MediaFile.MediaFileType type = MediaFile.getFileType(file.getAbsolutePath());
-        if (!MediaFile.isVideoFileType(type.fileType))
+        if (type == null || !MediaFile.isVideoFileType(type.fileType))
             return null;
 
         final SimpleFuture<BitmapInfo> ret = new SimpleFuture<BitmapInfo>();
-        ion.getBitmapLoadExecutorService().execute(new Runnable() {
+        Ion.getBitmapLoadExecutorService().execute(new Runnable() {
             @Override
             public void run() {
                 try {

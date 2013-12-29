@@ -6,9 +6,8 @@ import android.content.res.AssetManager;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.Canvas;
 import android.graphics.Matrix;
-import android.graphics.Paint;
+import android.graphics.Point;
 import android.os.Looper;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -50,7 +49,11 @@ public class IonBitmapCache {
     }
 
     public BitmapInfo remove(String key) {
-        return cache.remove(key);
+        return cache.removeBitmapInfo(key);
+    }
+
+    public void clear() {
+        cache.evictAllBitmapInfo();
     }
 
     public void put(BitmapInfo info) {
@@ -65,31 +68,16 @@ public class IonBitmapCache {
             return null;
 
         // see if this thing has an immediate cache hit
-        BitmapInfo ret = cache.get(key);
+        BitmapInfo ret = cache.getBitmapInfo(key);
         if (ret == null || ret.bitmaps != null)
             return ret;
 
-        // see if the the bitmap got evicted and put into a weak ref
-        if (ret.bitmapRef != null) {
-            Bitmap bitmap = ret.bitmapRef.get();
-            // see if we successfully repopulated from the weak ref
-            if (ret.bitmaps != null) {
-                cache.remove(key);
-                ret.bitmaps = new Bitmap[] { bitmap };
-                ret.bitmapRef = null;
-                cache.put(key, ret);
-                System.out.println("===== SUCCESSFULLY GRABBED FROM WEAK REF CACHE! ====");
-                return ret;
-            }
-            // ok, fall through and toss this, it's useless.
-        }
-        else {
-            // if this bitmap load previously errored out, see if it is time to retry
-            // the fetch. connectivity error, server failure, etc, shouldn't be
-            // cached indefinitely...
-            if (ret.loadTime + errorCacheDuration > System.currentTimeMillis())
-                return ret;
-        }
+        // if this bitmap load previously errored out, see if it is time to retry
+        // the fetch. connectivity error, server failure, etc, shouldn't be
+        // cached indefinitely...
+        if (ret.loadTime + errorCacheDuration > System.currentTimeMillis())
+            return ret;
+
         cache.remove(key);
         return null;
     }
@@ -99,8 +87,7 @@ public class IonBitmapCache {
         Log.i("IonBitmapCache", "freeMemory: " + Runtime.getRuntime().freeMemory());
     }
 
-    public Bitmap loadBitmap(byte[] bytes, int offset, int length, int minx, int miny) {
-        assert Thread.currentThread() != Looper.getMainLooper().getThread();
+    private Point computeTarget(int minx, int miny) {
         int targetWidth = minx;
         int targetHeight = miny;
         if (targetWidth == 0)
@@ -111,19 +98,28 @@ public class IonBitmapCache {
             targetHeight = metrics.heightPixels;
         if (targetHeight <= 0)
             targetHeight = Integer.MAX_VALUE;
+        return new Point(targetWidth, targetHeight);
+    }
+
+    public Bitmap loadBitmap(byte[] bytes, int offset, int length, int minx, int miny) {
+        assert Thread.currentThread() != Looper.getMainLooper().getThread();
+        Point target = computeTarget(minx, miny);
 
         BitmapFactory.Options o = null;
-        if (targetWidth != Integer.MAX_VALUE || targetHeight != Integer.MAX_VALUE) {
+        if (target.x != Integer.MAX_VALUE || target.y != Integer.MAX_VALUE) {
             o = new BitmapFactory.Options();
             o.inJustDecodeBounds = true;
             BitmapFactory.decodeByteArray(bytes, offset, length, o);
             if (o.outWidth < 0 || o.outHeight < 0)
                 return null;
-            int scale = Math.max(o.outWidth / targetWidth, o.outHeight / targetHeight);
+            int scale = Math.max(o.outWidth / target.x, o.outHeight / target.y);
             o = new BitmapFactory.Options();
             o.inSampleSize = scale;
         }
+
         Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, offset, length, o);
+        if (bitmap == null)
+            return null;
 
         int rotation = Exif.getOrientation(bytes, offset, length);
         if (rotation == 0)
@@ -138,19 +134,22 @@ public class IonBitmapCache {
         if (!stream.markSupported())
             stream = new MarkableInputStream(stream);
         assert Thread.currentThread() != Looper.getMainLooper().getThread();
-        int targetWidth = minx;
-        int targetHeight = miny;
-        if (targetWidth == 0)
-            targetWidth = metrics.widthPixels;
-        if (targetWidth <= 0)
-            targetWidth = Integer.MAX_VALUE;
-        if (targetHeight == 0)
-            targetHeight = metrics.heightPixels;
-        if (targetHeight <= 0)
-            targetHeight = Integer.MAX_VALUE;
+        Point target = computeTarget(minx, miny);
+
+        int rotation;
+        try {
+            byte[] bytes = new byte[50000];
+            stream.mark(Integer.MAX_VALUE);
+            int length = stream.read(bytes);
+            rotation = Exif.getOrientation(bytes, 0, length);
+            stream.reset();
+        }
+        catch (Exception e) {
+            rotation = 0;
+        }
 
         BitmapFactory.Options o = null;
-        if (targetWidth != Integer.MAX_VALUE || targetHeight != Integer.MAX_VALUE) {
+        if (target.x != Integer.MAX_VALUE || target.y != Integer.MAX_VALUE) {
             o = new BitmapFactory.Options();
             o.inJustDecodeBounds = true;
             stream.mark(Integer.MAX_VALUE);
@@ -163,11 +162,21 @@ public class IonBitmapCache {
             catch (Exception e) {
                 return null;
             }
-            int scale = Math.max(o.outWidth / targetWidth, o.outHeight / targetHeight);
+            int scale = Math.max(o.outWidth / target.x, o.outHeight / target.y);
             o = new BitmapFactory.Options();
             o.inSampleSize = scale;
         }
-        return BitmapFactory.decodeStream(stream, null, o);
+
+        Bitmap bitmap = BitmapFactory.decodeStream(stream, null, o);
+        if (bitmap == null)
+            return null;
+
+        if (rotation == 0)
+            return bitmap;
+
+        Matrix matrix = new Matrix();
+        matrix.postRotate(rotation);
+        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
     }
 
     private static int getHeapSize(final Context context) {
