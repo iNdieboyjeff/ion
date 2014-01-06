@@ -23,16 +23,21 @@ class BitmapToBitmapInfo extends BitmapCallback implements FutureCallback<Bitmap
     ArrayList<Transform> transforms;
 
     public static void getBitmapSnapshot(final Ion ion, final String transformKey) {
+        final BitmapCallback callback = new BitmapCallback(ion, transformKey, true);
         Ion.getBitmapLoadExecutorService().execute(new Runnable() {
             @Override
             public void run() {
-                final BitmapCallback callback = new BitmapCallback(ion, transformKey, true);
+                if (ion.bitmapsPending.tag(transformKey) != callback) {
+                    Log.d("IonBitmapLoader", "Bitmap cache load cancelled (no longer needed)");
+                    return;
+                }
+
                 try {
                     DiskLruCache.Snapshot snapshot = ion.responseCache.getDiskLruCache().get(transformKey);
                     try {
                         InputStream in = snapshot.getInputStream(0);
                         assert in instanceof FileInputStream;
-                        Bitmap bitmap = ion.getBitmapCache().loadBitmap(new BufferedInputStream((FileInputStream)in, 1024 * 64), -1, -1);
+                        Bitmap bitmap = ion.getBitmapCache().loadBitmap(in, -1, -1);
                         in.close();
                         if (bitmap == null)
                             throw new Exception("Bitmap failed to load");
@@ -87,7 +92,10 @@ class BitmapToBitmapInfo extends BitmapCallback implements FutureCallback<Bitmap
                 try {
                     for (int i = 0; i < result.bitmaps.length; i++) {
                         for (Transform transform : transforms) {
-                            info.bitmaps[i] = transform.transform(result.bitmaps[i]);
+                            Bitmap bitmap = transform.transform(result.bitmaps[i]);
+                            if (bitmap == null)
+                                throw new Exception("failed to transform bitmap");
+                            info.bitmaps[i] = bitmap;
                         }
                     }
                     info.delays = result.delays;

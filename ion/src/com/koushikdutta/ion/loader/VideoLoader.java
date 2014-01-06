@@ -90,10 +90,14 @@ public class VideoLoader extends SimpleLoader {
         Ion.getBitmapLoadExecutorService().execute(new Runnable() {
             @Override
             public void run() {
+                if (ret.isCancelled()) {
+//                    Log.d("VideoLoader", "Bitmap load cancelled (no longer needed)");
+                    return;
+                }
                 try {
                     Bitmap bmp = createVideoThumbnail(file.getAbsolutePath());
                     if (bmp == null)
-                        throw new Exception("bitmap failed to load");
+                        throw new Exception("video bitmap failed to load");
                     BitmapInfo info = new BitmapInfo();
                     info.bitmaps = new Bitmap[] {bmp};
                     info.loadedFrom = LoaderEmitter.LOADED_FROM_CACHE;
