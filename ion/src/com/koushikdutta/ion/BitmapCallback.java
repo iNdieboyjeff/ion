@@ -1,5 +1,7 @@
 package com.koushikdutta.ion;
 
+import android.graphics.Point;
+
 import com.koushikdutta.async.AsyncServer;
 import com.koushikdutta.async.future.FutureCallback;
 import com.koushikdutta.ion.Ion;
@@ -7,11 +9,11 @@ import com.koushikdutta.ion.bitmap.BitmapInfo;
 
 import java.util.ArrayList;
 
-class BitmapCallback {
+abstract class BitmapCallback {
     String key;
     Ion ion;
 
-    public BitmapCallback(Ion ion, String key, boolean put) {
+    protected BitmapCallback(Ion ion, String key, boolean put) {
         this.key = key;
         this.put = put;
         this.ion = ion;
@@ -25,6 +27,10 @@ class BitmapCallback {
         return put;
     }
 
+    protected void onReported() {
+        BitmapFetcher.processDeferred(ion);
+    }
+
     protected void report(final Exception e, final BitmapInfo info) {
         AsyncServer.post(Ion.mainHandler, new Runnable() {
             @Override
@@ -32,8 +38,7 @@ class BitmapCallback {
                 BitmapInfo result = info;
                 if (result == null) {
                     // cache errors
-                    result = new BitmapInfo();
-                    result.bitmaps = null;
+                    result = new BitmapInfo(null, new Point());
                     result.key = key;
                     result.exception = e;
                     ion.getBitmapCache().put(result);
@@ -42,12 +47,15 @@ class BitmapCallback {
                 }
 
                 final ArrayList<FutureCallback<BitmapInfo>> callbacks = ion.bitmapsPending.remove(key);
-                if (callbacks == null || callbacks.size() == 0)
+                if (callbacks == null || callbacks.size() == 0) {
+                    onReported();
                     return;
+                }
 
                 for (FutureCallback<BitmapInfo> callback : callbacks) {
                     callback.onCompleted(e, result);
                 }
+                onReported();
             }
         });
     }

@@ -1,6 +1,7 @@
 package com.koushikdutta.ion.loader;
 
 import android.graphics.Bitmap;
+import android.graphics.Point;
 import android.util.Log;
 
 import com.koushikdutta.async.DataEmitter;
@@ -43,11 +44,11 @@ public class FileLoader extends SimpleLoader {
                 }
                 try {
                     FileInputStream fin = new FileInputStream(new File(URI.create(uri)));
-                    Bitmap bitmap = ion.getBitmapCache().loadBitmap(fin, resizeWidth, resizeHeight);
+                    Point size = new Point();
+                    Bitmap bitmap = ion.getBitmapCache().loadBitmap(fin, resizeWidth, resizeHeight, size);
                     if (bitmap == null)
                         throw new Exception("Bitmap failed to load");
-                    BitmapInfo info = new BitmapInfo();
-                    info.bitmaps = new Bitmap[] { bitmap };
+                    BitmapInfo info = new BitmapInfo(new Bitmap[] { bitmap }, size);
                     info.loadedFrom =  Loader.LoaderEmitter.LOADED_FROM_CACHE;
                     fin.close();
                     ret.setComplete(info);
@@ -94,7 +95,7 @@ public class FileLoader extends SimpleLoader {
                 File file = new File(request.getUri());
                 FileDataEmitter emitter = new FileDataEmitter(ion.getHttpClient().getServer(), file);
                 ret.setComplete(emitter);
-                callback.onCompleted(null, new LoaderEmitter(emitter, (int)file.length(), LoaderEmitter.LOADED_FROM_CACHE, null, null));
+                callback.onCompleted(null, new LoaderEmitter(emitter, (int)file.length(), LoaderEmitter.LOADED_FROM_CACHE, null, request));
             }
         });
         return ret;

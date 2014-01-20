@@ -35,6 +35,7 @@ class IonDrawable extends Drawable {
     private boolean disableFadeIn;
     private int resizeWidth;
     private int resizeHeight;
+    private boolean mipmap;
 
     public IonDrawable cancel() {
         requestCount++;
@@ -45,13 +46,15 @@ class IonDrawable extends Drawable {
         return callback.imageViewFuture;
     }
     
-    public void setDisableFadeIn(boolean disableFadeIn) {
+    public IonDrawable setDisableFadeIn(boolean disableFadeIn) {
         this.disableFadeIn = disableFadeIn;
+        return this;
     }
 
-    public void setInAnimation(Animation inAnimation, int inAnimationResource) {
+    public IonDrawable setInAnimation(Animation inAnimation, int inAnimationResource) {
         callback.inAnimation = inAnimation;
         callback.inAnimationResource = inAnimationResource;
+        return this;
     }
 
     // create an internal static class that can act as a callback.
@@ -74,7 +77,6 @@ class IonDrawable extends Drawable {
         public void onCompleted(Exception e, BitmapInfo result) {
             assert Thread.currentThread() == Looper.getMainLooper().getThread();
             assert result != null;
-
             // see if the imageview is still alive and cares about this result
             ImageView imageView = imageViewRef.get();
             if (imageView == null)
@@ -92,6 +94,7 @@ class IonDrawable extends Drawable {
                 return;
 
             drawable.requestCount++;
+
             imageView.setImageDrawable(null);
             drawable.setBitmap(result, result.loadedFrom);
             imageView.setImageDrawable(drawable);
@@ -117,10 +120,27 @@ class IonDrawable extends Drawable {
         if (previousKey == null)
             return;
 
+        // unregister this drawable from the bitmaps that are
+        // pending.
         Object owner = ion.bitmapsPending.removeItem(previousKey, callback);
-        if (owner instanceof BitmapToBitmapInfo) {
-            BitmapToBitmapInfo info = (BitmapToBitmapInfo)owner;
-            ion.bitmapsPending.removeItem(info.downloadKey, info);
+
+        // if this drawable was the only thing waiting for this bitmap,
+        // then the removeItem call will return the TransformBitmap/LoadBitmap instance
+        // that was providing the result.
+
+        // cancel/remove the transform
+        if (owner instanceof TransformBitmap) {
+            TransformBitmap info = (TransformBitmap)owner;
+            // this transform is also backed by a LoadBitmap, grab that
+            // if it is the only waiter
+            owner = ion.bitmapsPending.removeItem(info.downloadKey, info);
+        }
+
+        // cancel the load
+        if (owner instanceof LoadBitmap) {
+//            LoadBitmap load = (LoadBitmap)owner;
+//            load.emitterTransform.cancel();
+            BitmapFetcher.processDeferred(ion);
         }
     }
 
@@ -206,8 +226,11 @@ class IonDrawable extends Drawable {
 
     @Override
     public int getIntrinsicWidth() {
-        if (info != null && info.bitmaps != null)
-            return info.bitmaps[0].getScaledWidth(resources.getDisplayMetrics().densityDpi);
+        if (info != null && info.bitmaps != null) {
+            if (!mipmap)
+                return info.bitmaps[0].getScaledWidth(resources.getDisplayMetrics().densityDpi);
+            return info.originalSize.x;
+        }
         if (resizeWidth > 0)
             return resizeWidth;
         if (info != null) {
@@ -227,8 +250,11 @@ class IonDrawable extends Drawable {
 
     @Override
     public int getIntrinsicHeight() {
-        if (info != null && info.bitmaps != null)
-            return info.bitmaps[0].getScaledHeight(resources.getDisplayMetrics().densityDpi);
+        if (info != null && info.bitmaps != null) {
+            if (!mipmap)
+                return info.bitmaps[0].getScaledHeight(resources.getDisplayMetrics().densityDpi);
+            return info.originalSize.y;
+        }
         if (resizeHeight > 0)
             return resizeHeight;
         if (info != null) {
@@ -259,6 +285,11 @@ class IonDrawable extends Drawable {
             invalidateSelf();
         }
     };
+
+    public IonDrawable setMipmap(boolean mipmap) {
+        this.mipmap = mipmap;
+        return this;
+    }
 
     @Override
     public void draw(Canvas canvas) {
@@ -368,13 +399,10 @@ class IonDrawable extends Drawable {
     static IonDrawable getOrCreateIonDrawable(ImageView imageView) {
         Drawable current = imageView.getDrawable();
         IonDrawable ret;
-        if (current == null || !(current instanceof IonDrawable)) {
+        if (current == null || !(current instanceof IonDrawable))
             ret = new IonDrawable(imageView.getResources(), imageView);
-            imageView.setImageDrawable(ret);
-        }
-        else {
+        else
             ret = (IonDrawable)current;
-        }
         // invalidate self doesn't seem to trigger the dimension check to be called by imageview.
         // are drawable dimensions supposed to be immutable?
         imageView.setImageDrawable(null);
