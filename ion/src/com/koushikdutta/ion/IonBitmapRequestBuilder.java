@@ -203,7 +203,7 @@ class IonBitmapRequestBuilder implements Builders.ImageView.F, ImageViewFutureBu
         }
 
         // see if something is downloading this
-        if (!ion.bitmapsPending.contains(downloadKey)) {
+        if (ion.bitmapsPending.tag(downloadKey) == null) {
             final LoadMipmap loadMipmap = new LoadMipmap(ion, downloadKey);
             // nothing downloading, see if a file already exists
             DiskLruCache diskLruCache = ion.responseCache.getDiskLruCache();

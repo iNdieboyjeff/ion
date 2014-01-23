@@ -6,8 +6,10 @@ import android.content.res.AssetManager;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.BitmapRegionDecoder;
 import android.graphics.Matrix;
 import android.graphics.Point;
+import android.graphics.Rect;
 import android.os.Looper;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -146,6 +148,11 @@ public class IonBitmapCache {
         Matrix matrix = new Matrix();
         matrix.postRotate(rotation);
         return Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
+    }
+
+    public Bitmap loadRegion(BitmapRegionDecoder decoder, Rect sourceRect) {
+        decoder.decodeRegion()
+        return null;
     }
 
     public Bitmap loadBitmap(InputStream stream, int minx, int miny, Point outSize) {
