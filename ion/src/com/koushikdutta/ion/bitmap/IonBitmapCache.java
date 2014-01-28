@@ -151,7 +151,7 @@ public class IonBitmapCache {
     }
 
     public Bitmap loadRegion(BitmapRegionDecoder decoder, Rect sourceRect) {
-        decoder.decodeRegion()
+//        decoder.decodeRegion()
         return null;
     }
 
