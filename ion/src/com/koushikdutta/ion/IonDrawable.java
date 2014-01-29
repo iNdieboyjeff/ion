@@ -6,6 +6,7 @@ import android.graphics.Color;
 import android.graphics.ColorFilter;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
+import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Looper;
@@ -94,8 +95,6 @@ class IonDrawable extends Drawable {
             if (drawable.requestCount != requestId)
                 return;
 
-            drawable.requestCount++;
-
             imageView.setImageDrawable(null);
             drawable.setBitmap(result, result.loadedFrom);
             imageView.setImageDrawable(drawable);
@@ -152,6 +151,7 @@ class IonDrawable extends Drawable {
     private boolean invalidateScheduled;
     public IonDrawable setBitmap(BitmapInfo info, int loadedFrom) {
         this.loadedFrom = loadedFrom;
+        requestCount++;
 
         if (this.info == info)
             return this;
@@ -349,14 +349,31 @@ class IonDrawable extends Drawable {
             Rect bounds = getBounds();
 
             float zoom = (float)canvas.getWidth() / (float)clip.width();
-            double level = Math.abs(Math.round(Math.log(zoom) / Math.log(2)));
+//            double level = Math.abs(Math.round(Math.log(zoom) / Math.log(2)));
 
+            float zoomWidth = zoom * bounds.width();
+            float zoomHeight = zoom * bounds.height();
+
+            double wlevel = Math.log(zoomWidth / 256) / Math.log(2);
+            double hlevel = Math.log(zoomHeight/ 256) / Math.log(2);
+            double level = Math.max(wlevel, hlevel);
+
+
+            Point p = new Point(canvas.getWidth(), canvas.getHeight());
 
 //            System.out.println("width: " + clip.width());
 //            System.out.println("height: " + clip.height());
+//            System.out.println("clip: " + clip);
+//            System.out.println("zoom: " + zoom);
+            System.out.println("bounds: " + bounds);
             System.out.println("clip: " + clip);
-            System.out.println("zoom: " + zoom);
+            System.out.println("canvas: " + p);
+            System.out.println("zoomWidth: " + zoomWidth);
+            System.out.println("zoomHeight: " + zoomHeight);
             System.out.println("level: " + level);
+
+
+
 
             paint.setColor(Color.RED);
             canvas.drawRect(getBounds(), paint);
