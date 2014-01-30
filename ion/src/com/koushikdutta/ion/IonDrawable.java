@@ -39,9 +39,15 @@ class IonDrawable extends Drawable {
     private boolean disableFadeIn;
     private int resizeWidth;
     private int resizeHeight;
+    private Ion ion;
 
     public IonDrawable cancel() {
         requestCount++;
+        return this;
+    }
+
+    public IonDrawable ion(Ion ion) {
+        this.ion = ion;
         return this;
     }
 
@@ -395,14 +401,17 @@ class IonDrawable extends Drawable {
             int levelTiles = 1 << level;
             int levelDim = levelTiles * TILE_DIM;
             Rect visible = new Rect(visibleLeft, visibleTop, visibleRight, visibleBottom);
-            System.out.println("visible: " + visible);
-
+//            System.out.println("visible: " + visible);
 
             int textureTileDim = textureDim / levelTiles;
+
+            paint.setColor(Color.BLACK);
+            canvas.drawRect(getBounds(), paint);
 
             for (int y = 0; y < levelTiles; y++) {
                 int top = textureTileDim * y;
                 int bottom = textureTileDim * (y + 1);
+                bottom = Math.min(bottom, bounds.bottom);
                 if (bottom < visibleTop)
                     continue;
                 if (top > visibleBottom)
@@ -410,23 +419,39 @@ class IonDrawable extends Drawable {
                 for (int x = 0; x < levelTiles; x++) {
                     int left = textureTileDim * x;
                     int right = textureTileDim * (x + 1);
+                    right = Math.min(right, bounds.right);
                     if (right < visibleLeft)
                         continue;
                     if (left > visibleRight)
                         continue;
 
-                    // fetch render
-                    Rect render = new Rect(left, top, right, bottom);
-                    System.out.println("rendering: " + render);
-                    String tileKey = ResponseCacheMiddleware.toKeyString(info.key + x + "," + y);
-//                    BitmapInfo tile =
+                    Rect texRect = new Rect(left, top, right, bottom);
+
+                    // find, render/fetch
+                    System.out.println("rendering: " + texRect + " for: " + bounds);
+                    String tileKey = ResponseCacheMiddleware.toKeyString(info.key + "," + level + "," + x + "," + y);
+                    BitmapInfo tile = ion.bitmapCache.get(tileKey);
+                    if (tile != null) {
+                        // render it
+                        if (tile.bitmaps != null) {
+                            System.out.println("bitmap is: " + tile.bitmaps[0].getWidth() + "x" + tile.bitmaps[0].getHeight());
+                            canvas.drawBitmap(tile.bitmaps[0], null, texRect, paint);
+                        }
+                        continue;
+                    }
+
+                    if (ion.bitmapsPending.tag(tileKey) == null) {
+                        // fetch it
+                        LoadBitmapRegion region = new LoadBitmapRegion(ion, tileKey, info.mipmap, texRect, level);
+                    }
+                    ion.bitmapsPending.add(tileKey, tileCallback);
                 }
             }
 
 
-            paint.setColor(Color.RED);
-            canvas.drawRect(getBounds(), paint);
-            paint.reset();
+//            paint.setColor(Color.RED);
+//            canvas.drawRect(getBounds(), paint);
+//            paint.reset();
         }
         else {
             Drawable error = tryGetErrorResource();

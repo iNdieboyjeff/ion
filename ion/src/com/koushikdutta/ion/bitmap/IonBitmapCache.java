@@ -1,5 +1,6 @@
 package com.koushikdutta.ion.bitmap;
 
+import android.annotation.TargetApi;
 import android.app.ActivityManager;
 import android.content.Context;
 import android.content.res.AssetManager;
@@ -10,6 +11,7 @@ import android.graphics.BitmapRegionDecoder;
 import android.graphics.Matrix;
 import android.graphics.Point;
 import android.graphics.Rect;
+import android.os.Build;
 import android.os.Looper;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -150,9 +152,11 @@ public class IonBitmapCache {
         return Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
     }
 
-    public Bitmap loadRegion(BitmapRegionDecoder decoder, Rect sourceRect) {
-//        decoder.decodeRegion()
-        return null;
+    @TargetApi(Build.VERSION_CODES.GINGERBREAD_MR1)
+    public Bitmap loadRegion(BitmapRegionDecoder decoder, Rect sourceRect, int level) {
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inSampleSize = 1 << level;
+        return decoder.decodeRegion(sourceRect, options);
     }
 
     public Bitmap loadBitmap(InputStream stream, int minx, int miny, Point outSize) {
