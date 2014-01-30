@@ -236,7 +236,6 @@ class IonBitmapRequestBuilder implements Builders.ImageView.F, ImageViewFutureBu
 
     private IonDrawable setIonDrawable(ImageView imageView, BitmapInfo info, int loadedFrom) {
         IonDrawable ret = IonDrawable.getOrCreateIonDrawable(imageView)
-        .setMipmap(mipmap)
         .setBitmap(info, loadedFrom)
         .setSize(resizeWidth, resizeHeight)
         .setError(errorResource, errorDrawable)
