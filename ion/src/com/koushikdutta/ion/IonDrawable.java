@@ -409,8 +409,8 @@ class IonDrawable extends Drawable {
             canvas.drawRect(getBounds(), paint);
 
             int sampleSize = 1;
-            while (textureTileDim >> (sampleSize - 1) > TILE_DIM || textureTileDim >> (sampleSize - 1) > TILE_DIM)
-                sampleSize++;
+            while (textureTileDim / sampleSize > TILE_DIM)
+                sampleSize <<= 1;
 
             for (int y = 0; y < levelTiles; y++) {
                 int top = textureTileDim * y;
