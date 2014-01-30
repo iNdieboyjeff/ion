@@ -373,7 +373,7 @@ class IonDrawable extends Drawable {
             // draw stuff that needs drawing
             // use parent level tiles for tiles that do not exist
             // crossfading?
-            System.out.println(info.mipmap);
+//            System.out.println(info.mipmap);
 
             Rect clip = canvas.getClipBounds();
             Rect bounds = getBounds();
@@ -397,7 +397,7 @@ class IonDrawable extends Drawable {
             int visibleRight = Math.min(bounds.width(), clip.right);
             int visibleTop = Math.max(0, clip.top);
             int visibleBottom = Math.min(bounds.height(), clip.bottom);
-            int level = (int)maxLevel;
+            int level = (int)Math.ceil(maxLevel);
             int levelTiles = 1 << level;
             int levelDim = levelTiles * TILE_DIM;
             Rect visible = new Rect(visibleLeft, visibleTop, visibleRight, visibleBottom);
@@ -407,6 +407,10 @@ class IonDrawable extends Drawable {
 
             paint.setColor(Color.BLACK);
             canvas.drawRect(getBounds(), paint);
+
+            int sampleSize = 1;
+            while (textureTileDim >> (sampleSize - 1) > TILE_DIM || textureTileDim >> (sampleSize - 1) > TILE_DIM)
+                sampleSize++;
 
             for (int y = 0; y < levelTiles; y++) {
                 int top = textureTileDim * y;
@@ -428,13 +432,13 @@ class IonDrawable extends Drawable {
                     Rect texRect = new Rect(left, top, right, bottom);
 
                     // find, render/fetch
-                    System.out.println("rendering: " + texRect + " for: " + bounds);
+//                    System.out.println("rendering: " + texRect + " for: " + bounds);
                     String tileKey = ResponseCacheMiddleware.toKeyString(info.key + "," + level + "," + x + "," + y);
                     BitmapInfo tile = ion.bitmapCache.get(tileKey);
                     if (tile != null) {
                         // render it
                         if (tile.bitmaps != null) {
-                            System.out.println("bitmap is: " + tile.bitmaps[0].getWidth() + "x" + tile.bitmaps[0].getHeight());
+//                            System.out.println("bitmap is: " + tile.bitmaps[0].getWidth() + "x" + tile.bitmaps[0].getHeight());
                             canvas.drawBitmap(tile.bitmaps[0], null, texRect, paint);
                         }
                         continue;
@@ -442,7 +446,7 @@ class IonDrawable extends Drawable {
 
                     if (ion.bitmapsPending.tag(tileKey) == null) {
                         // fetch it
-                        LoadBitmapRegion region = new LoadBitmapRegion(ion, tileKey, info.mipmap, texRect, level);
+                        LoadBitmapRegion region = new LoadBitmapRegion(ion, tileKey, info.mipmap, texRect, sampleSize);
                     }
                     ion.bitmapsPending.add(tileKey, tileCallback);
                 }
