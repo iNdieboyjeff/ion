@@ -25,7 +25,12 @@ public class SimpleLoader implements Loader {
     }
 
     @Override
-    public Future<BitmapInfo> loadBitmap(Ion ion, String uri, int resizeWidth, int resizeHeight) {
+    public Future<BitmapInfo> loadBitmap(Ion ion, String key, String uri, int resizeWidth, int resizeHeight) {
+        return null;
+    }
+
+    @Override
+    public Future<AsyncHttpRequest> resolve(Ion ion, AsyncHttpRequest request) {
         return null;
     }
 }
