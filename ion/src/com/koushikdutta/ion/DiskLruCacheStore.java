@@ -51,7 +51,7 @@ public class DiskLruCacheStore {
                 final OutputStream out;
                 try {
                     out = editor.newOutputStream(0);
-                    for (int i = 1; i < cache.getValueCount(); i++) {
+                    for (int i = 1; i < cache.size(); i++) {
                         editor.newOutputStream(i).close();
                     }
                 }
