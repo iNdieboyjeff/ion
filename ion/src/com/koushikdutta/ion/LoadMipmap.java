@@ -31,21 +31,21 @@ public class LoadMipmap extends BitmapCallback implements FutureCallback<File> {
             return;
         }
 
-        Ion.getBitmapLoadExecutorService().execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    BitmapRegionDecoder decoder = BitmapRegionDecoder.newInstance(file.toString(), false);
-                    Point size = new Point(decoder.getWidth(), decoder.getHeight());
-                    BitmapInfo info = new BitmapInfo(null, size);
-                    info.mipmap = decoder;
-                    info.loadedFrom = Loader.LoaderEmitter.LOADED_FROM_NETWORK;
-                    info.key = key;
-                    report(null, info);
-                } catch (Exception e) {
-                    report(e, null);
-                }
-            }
-        });
+//        Ion.getBitmapLoadExecutorService().execute(new Runnable() {
+//            @Override
+//            public void run() {
+//                try {
+//                    BitmapRegionDecoder decoder = BitmapRegionDecoder.newInstance(file.toString(), false);
+//                    Point size = new Point(decoder.getWidth(), decoder.getHeight());
+//                    BitmapInfo info = new BitmapInfo(null, size);
+//                    info.mipmap = decoder;
+//                    info.loadedFrom = Loader.LoaderEmitter.LOADED_FROM_NETWORK;
+//                    info.key = key;
+//                    report(null, info);
+//                } catch (Exception e) {
+//                    report(e, null);
+//                }
+//            }
+//        });
     }
 }
