@@ -28,11 +28,13 @@ import com.koushikdutta.ion.builder.Builders;
 import com.koushikdutta.ion.builder.FutureBuilder;
 import com.koushikdutta.ion.builder.LoadBuilder;
 import com.koushikdutta.ion.cookie.CookieMiddleware;
+import com.koushikdutta.ion.loader.AssetLoader;
 import com.koushikdutta.ion.loader.AsyncHttpRequestFactory;
 import com.koushikdutta.ion.loader.ContentLoader;
 import com.koushikdutta.ion.loader.FileLoader;
 import com.koushikdutta.ion.loader.HttpLoader;
 import com.koushikdutta.ion.loader.PackageIconLoader;
+import com.koushikdutta.ion.loader.ResourceLoader;
 import com.koushikdutta.ion.loader.VideoLoader;
 
 import java.io.File;
@@ -146,6 +148,8 @@ public class Ion {
     FileCache storeCache;
     HttpLoader httpLoader;
     ContentLoader contentLoader;
+    ResourceLoader resourceLoader;
+    AssetLoader assetLoader;
     VideoLoader videoLoader;
     PackageIconLoader packageIconLoader;
     FileLoader fileLoader;
@@ -197,6 +201,8 @@ public class Ion {
                 .addLoader(packageIconLoader = new PackageIconLoader())
                 .addLoader(httpLoader = new HttpLoader())
                 .addLoader(contentLoader = new ContentLoader())
+                .addLoader(resourceLoader = new ResourceLoader())
+                .addLoader(assetLoader = new AssetLoader())
                 .addLoader(fileLoader = new FileLoader());
     }
 
