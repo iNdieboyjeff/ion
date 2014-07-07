@@ -37,6 +37,8 @@ import com.koushikdutta.ion.loader.PackageIconLoader;
 import com.koushikdutta.ion.loader.ResourceLoader;
 import com.koushikdutta.ion.loader.VideoLoader;
 
+import org.apache.http.conn.ssl.BrowserCompatHostnameVerifier;
+
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -163,10 +165,11 @@ public class Ion {
     Config config = new Config();
     IonBitmapCache bitmapCache;
     Context context;
-    IonBitmapRequestBuilder bitmapBuilder = new IonBitmapRequestBuilder(this);
+    IonImageViewRequestBuilder bitmapBuilder = new IonImageViewRequestBuilder(this);
 
     private Ion(Context context, String name) {
         httpClient = new AsyncHttpClient(new AsyncServer("ion-" + name));
+        httpClient.getSSLSocketMiddleware().setHostnameVerifier(new BrowserCompatHostnameVerifier());
         this.context = context = context.getApplicationContext();
         this.name = name;
 

@@ -1,12 +1,15 @@
 package com.koushikdutta.ion;
 
 import android.content.res.Resources;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.ColorFilter;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Looper;
@@ -42,11 +45,6 @@ class IonDrawable extends Drawable {
     private int resizeHeight;
     private Ion ion;
 
-    public IonDrawable cancel() {
-        requestCount++;
-        return this;
-    }
-
     public IonDrawable ion(Ion ion) {
         this.ion = ion;
         return this;
@@ -62,6 +60,10 @@ class IonDrawable extends Drawable {
         if (errorResource != 0)
             return resources.getDrawable(errorResource);
         return null;
+    }
+
+    public BitmapInfo getBitmapInfo() {
+        return info;
     }
 
     public static class ImageViewFutureImpl extends SimpleFuture<ImageView> implements ImageViewFuture {
@@ -113,7 +115,6 @@ class IonDrawable extends Drawable {
         private ImageViewFutureImpl imageViewFuture = new ImageViewFutureImpl();
         private Animation inAnimation;
         private int inAnimationResource;
-        private int requestId;
 
         public IonDrawableCallback(IonDrawable drawable, ImageView imageView) {
             ionDrawableRef = new WeakReference<IonDrawable>(drawable);
@@ -136,10 +137,6 @@ class IonDrawable extends Drawable {
             if (imageView.getDrawable() != drawable)
                 return;
 
-            // see if the ImageView is still waiting for the same request
-            if (drawable.requestCount != requestId)
-                return;
-
             imageView.setImageDrawable(null);
             drawable.setBitmap(result, result.loadedFrom);
             imageView.setImageDrawable(drawable);
@@ -154,26 +151,25 @@ class IonDrawable extends Drawable {
         }
     }
 
-    int requestCount;
-    public void register(Ion ion, String bitmapKey) {
-        callback.requestId = ++requestCount;
-        String previousKey = callback.bitmapKey;
-        if (TextUtils.equals(previousKey, bitmapKey))
+    public void cancel() {
+        if (callback.bitmapKey == null)
             return;
-        callback.bitmapKey = bitmapKey;
-        ion.bitmapsPending.add(bitmapKey, callback);
-        if (previousKey == null)
-            return;
+        ion.bitmapsPending.removeItem(callback.bitmapKey, callback);
+        callback.bitmapKey = null;
+    }
 
+    private static void unregister(Ion ion, String key, IonDrawableCallback callback) {
+        if (key == null)
+            return;
         // unregister this drawable from the bitmaps that are
         // pending.
 
         // if this drawable was the only thing waiting for this bitmap,
         // then the removeItem call will return the TransformBitmap/LoadBitmap instance
         // that was providing the result.
-        if (ion.bitmapsPending.removeItem(previousKey, callback)) {
+        if (ion.bitmapsPending.removeItem(key, callback)) {
             // find out who owns this thing, to see if it is a candidate for removal
-            Object owner = ion.bitmapsPending.tag(previousKey);
+            Object owner = ion.bitmapsPending.tag(key);
             if (owner instanceof TransformBitmap) {
                 TransformBitmap info = (TransformBitmap)owner;
                 ion.bitmapsPending.remove(info.key);
@@ -191,6 +187,15 @@ class IonDrawable extends Drawable {
         ion.processDeferred();
     }
 
+    public void register(Ion ion, String bitmapKey) {
+        String previousKey = callback.bitmapKey;
+        if (TextUtils.equals(previousKey, bitmapKey))
+            return;
+        callback.bitmapKey = bitmapKey;
+        ion.bitmapsPending.add(bitmapKey, callback);
+        unregister(ion, previousKey, callback);
+    }
+
     private static final int DEFAULT_PAINT_FLAGS = Paint.FILTER_BITMAP_FLAG | Paint.DITHER_FLAG;
 
     public IonDrawable(Resources resources, ImageView imageView) {
@@ -205,7 +210,6 @@ class IonDrawable extends Drawable {
     private int maxLevel;
     public IonDrawable setBitmap(BitmapInfo info, int loadedFrom) {
         this.loadedFrom = loadedFrom;
-        requestCount++;
 
         if (this.info == info)
             return this;
@@ -251,21 +255,25 @@ class IonDrawable extends Drawable {
     }
 
     public IonDrawable setError(int resource, Drawable drawable) {
-        if ((drawable != null && drawable == this.error) || (resource != 0 && resource == errorResource))
+        if ((drawable != null && drawable == error) || (resource != 0 && resource == errorResource))
             return this;
 
-        this.errorResource = resource;
-        this.error = drawable;
+        errorResource = resource;
+        if (error != null)
+            error.setCallback(null);
+        error = drawable;
         invalidateSelf();
         return this;
     }
 
     public IonDrawable setPlaceholder(int resource, Drawable drawable) {
-        if ((drawable != null && drawable == this.placeholder) || (resource != 0 && resource == placeholderResource))
+        if ((drawable != null && drawable == placeholder) || (resource != 0 && resource == placeholderResource))
             return this;
 
-        this.placeholderResource = resource;
-        this.placeholder = drawable;
+        placeholderResource = resource;
+        if (placeholder != null)
+            placeholder.setCallback(null);
+        placeholder = drawable;
         invalidateSelf();
 
         return this;
@@ -283,36 +291,66 @@ class IonDrawable extends Drawable {
         invalidateSelf();
     }
 
+    Callback drawableCallback = new Callback() {
+        @Override
+        public void invalidateDrawable(Drawable who) {
+            IonDrawable.this.invalidateSelf();
+        }
+
+        @Override
+        public void scheduleDrawable(Drawable who, Runnable what, long when) {
+            IonDrawable.this.scheduleSelf(what, when);
+        }
+
+        @Override
+        public void unscheduleDrawable(Drawable who, Runnable what) {
+            IonDrawable.this.unscheduleSelf(what);
+        }
+    };
+
     private Drawable tryGetErrorResource() {
         if (error != null)
             return error;
         if (errorResource == 0)
             return null;
-        return error = resources.getDrawable(errorResource);
+        error = resources.getDrawable(errorResource);
+        error.setCallback(drawableCallback);
+        return error;
+    }
+
+    private Drawable tryGetPlaceholderResource() {
+        if (placeholder != null)
+            return placeholder;
+        if (placeholderResource == 0)
+            return null;
+        placeholder = resources.getDrawable(placeholderResource);
+        placeholder.setCallback(drawableCallback);
+        return placeholder;
     }
 
     @Override
     public int getIntrinsicWidth() {
+        // first check if image was loaded
         if (info != null) {
             if (info.decoder != null)
                 return info.originalSize.x;
             if (info.bitmaps != null)
                 return info.bitmaps[0].getScaledWidth(resources.getDisplayMetrics().densityDpi);
         }
+        // check eventual image size...
         if (resizeWidth > 0)
             return resizeWidth;
+        // no image, but there was an error
         if (info != null) {
             Drawable error = tryGetErrorResource();
             if (error != null)
                 return error.getIntrinsicWidth();
         }
-        if (placeholder != null) {
+        // check placeholder
+        Drawable placeholder = tryGetPlaceholderResource();
+        if (placeholder != null)
             return placeholder.getIntrinsicWidth();
-        } else if (placeholderResource != 0) {
-            Drawable d = resources.getDrawable(placeholderResource);
-            assert d != null;
-            return d.getIntrinsicWidth();
-        }
+        // we're SOL
         return -1;
     }
 
@@ -327,21 +365,13 @@ class IonDrawable extends Drawable {
         if (resizeHeight > 0)
             return resizeHeight;
         if (info != null) {
-            if (error != null) {
+            Drawable error = tryGetErrorResource();
+            if (error != null)
                 return error.getIntrinsicHeight();
-            } else if (errorResource != 0) {
-                Drawable d = resources.getDrawable(errorResource);
-                assert d != null;
-                return d.getIntrinsicHeight();
-            }
         }
-        if (placeholder != null) {
+        Drawable placeholder = tryGetPlaceholderResource();
+        if (placeholder != null)
             return placeholder.getIntrinsicHeight();
-        } else if (placeholderResource != 0) {
-            Drawable d = resources.getDrawable(placeholderResource);
-            assert d != null;
-            return d.getIntrinsicHeight();
-        }
         return -1;
     }
 
@@ -365,16 +395,59 @@ class IonDrawable extends Drawable {
         }
     };
 
+    private void drawDrawable(Canvas canvas, Drawable d) {
+        if (d == null)
+            return;
+
+        if (false) {
+            // this centers inside and draws the drawable
+            d.setBounds(0 , 0, d.getIntrinsicWidth(), d.getIntrinsicHeight());
+            int count = canvas.save();
+            Matrix matrix = new Matrix();
+            matrix.setRectToRect(new RectF(0, 0, d.getIntrinsicWidth(), d.getIntrinsicHeight()),
+            new RectF(canvas.getClipBounds()), Matrix.ScaleToFit.CENTER);
+            canvas.concat(matrix);
+
+            float scale = (float)canvas.getClipBounds().width() / canvas.getWidth();
+            canvas.scale(scale, scale, d.getIntrinsicWidth() / 2, d.getIntrinsicHeight() / 2);
+
+            d.draw(canvas);
+            canvas.restoreToCount(count);
+            return;
+        }
+        else if (false) {
+            // this centers fits and draws the drawable
+            int iw = d.getIntrinsicWidth();
+            int ih = d.getIntrinsicHeight();
+
+            Rect b = copyBounds();
+            int w = b.width();
+            int h = b.height();
+            if (iw >= 0) {
+                int wp = (w - iw) / 2;
+                b.left += wp;
+                b.right = b.left + iw;
+            }
+            if (ih >= 0) {
+                int hp = (h - ih) / 2;
+                b.top += hp;
+                b.bottom = b.top + ih;
+            }
+            d.setBounds(b);
+        }
+        else {
+            // fitxy the drwable
+            d.setBounds(getBounds());
+        }
+
+        d.draw(canvas);
+    }
+
     @Override
     public void draw(Canvas canvas) {
         // TODO: handle animated drawables
         if (info == null) {
-            if (placeholder == null && placeholderResource != 0)
-                placeholder = resources.getDrawable(placeholderResource);
-            if (placeholder != null) {
-                placeholder.setBounds(getBounds());
-                placeholder.draw(canvas);
-            }
+            drawDrawable(canvas, tryGetPlaceholderResource());
             return;
         }
 
@@ -389,11 +462,9 @@ class IonDrawable extends Drawable {
         }
 
         if (destAlpha != 255) {
-            if (placeholder == null && placeholderResource != 0)
-                placeholder = resources.getDrawable(placeholderResource);
+            Drawable placeholder = tryGetPlaceholderResource();
             if (placeholder != null) {
-                placeholder.setBounds(getBounds());
-                placeholder.draw(canvas);
+                drawDrawable(canvas, placeholder);
             }
         }
 
@@ -565,8 +636,7 @@ class IonDrawable extends Drawable {
             Drawable error = tryGetErrorResource();
             if (error != null) {
                 error.setAlpha((int)destAlpha);
-                error.setBounds(getBounds());
-                error.draw(canvas);
+                drawDrawable(canvas, error);
                 error.setAlpha(0xFF);
             }
         }
