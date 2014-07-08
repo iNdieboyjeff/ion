@@ -152,9 +152,10 @@ class IonDrawable extends Drawable {
     }
 
     public void cancel() {
-        if (callback.bitmapKey == null)
-            return;
-        ion.bitmapsPending.removeItem(callback.bitmapKey, callback);
+//        if (callback.bitmapKey == null)
+//            return;
+//        ion.bitmapsPending.removeItem(callback.bitmapKey, callback);
+        unregister(ion, callback.bitmapKey, callback);
         callback.bitmapKey = null;
     }
 
@@ -209,16 +210,15 @@ class IonDrawable extends Drawable {
     private int textureDim;
     private int maxLevel;
     public IonDrawable setBitmap(BitmapInfo info, int loadedFrom) {
-        this.loadedFrom = loadedFrom;
-
         if (this.info == info)
             return this;
 
-        invalidateSelf();
-
+        cancel();
+        this.loadedFrom = loadedFrom;
         this.info = info;
         currentFrame = 0;
         invalidateScheduled = false;
+        invalidateSelf();
         if (info == null) {
             callback.bitmapKey = null;
             return this;
