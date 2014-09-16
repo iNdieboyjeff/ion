@@ -51,13 +51,13 @@ class LoadBitmap extends LoadBitmapEmitter implements FutureCallback<ByteBufferL
                     return;
                 }
 
-                ByteBuffer bb = result.getAll();
+                ByteBuffer bb = null;
                 try {
+                    bb = result.getAll();
+
                     Bitmap[] bitmaps;
                     int[] delays;
                     BitmapFactory.Options options = ion.bitmapCache.prepareBitmapOptions(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining(), resizeWidth, resizeHeight);
-                    if (options == null)
-                        throw new Exception("BitmapFactory.Options failed to load");
                     final Point size = new Point(options.outWidth, options.outHeight);
                     if (animateGif && TextUtils.equals("image/gif", options.outMimeType)) {
                         GifDecoder decoder = new GifDecoder(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining(), new GifAction() {
@@ -102,7 +102,8 @@ class LoadBitmap extends LoadBitmapEmitter implements FutureCallback<ByteBufferL
                     report(e, null);
                 }
                 finally {
-                    ByteBufferList.reclaim(bb);
+                    if (bb != null)
+                        ByteBufferList.reclaim(bb);
                 }
             }
         });
